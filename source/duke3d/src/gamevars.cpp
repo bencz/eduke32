@@ -1507,8 +1507,8 @@ static weapondata_t weapondefaults[MAX_WEAPONS] = {
     },
 
     {
-        SHOTGUN_WEAPON, 0, 13, 4, 30, 0,
-        WEAPON_CHECKATRELOAD,
+        SHOTGUN_WEAPON, 0, 0, 2, 4, 0,
+        WEAPON_AUTOMATIC,
         SHOTGUN__, 24, SHOTGUNSHELL__, 7, 0, SHOTGUN_FIRE__, 15, SHOTGUN_COCK__,
         EJECT_CLIP__, INSERT_CLIP__, SHOTGUN_COCK__, 255+(95<<8)
     },
