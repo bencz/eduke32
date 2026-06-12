@@ -59,6 +59,7 @@ enum cheatindex_t
     CHEAT_DEBUG,
     CHEAT_RESERVED3,  // 25
     CHEAT_COMEGETSOME,
+    CHEAT_AMMO,
     NUMCHEATS,
 };
 
@@ -90,5 +91,6 @@ enum CheatCodeFunctions
     CHEATFUNC_QUOTEALLEN,
     CHEATFUNC_COORDS,
     CHEATFUNC_DEBUG,
+    CHEATFUNC_AMMO,  // infinite ammo toggle
     NUMCHEATFUNCS,
 };

@@ -1521,8 +1521,10 @@ static weapondata_t weapondefaults[MAX_WEAPONS] = {
     },
 
     {
-        RPG_WEAPON, 0, 0, 4, 20, 0,
-        0,
+        // Rapid-fire RPG. FireDelay/TotalTime slashed (was 4/20) and
+        // WEAPON_AUTOMATIC added so holding fire launches rockets in fast succession.
+        RPG_WEAPON, 0, 0, 2, 4, 0,
+        WEAPON_AUTOMATIC,
         RPG__, 0, 0, 0, 0, 0, 0, 0,
         EJECT_CLIP__, INSERT_CLIP__, SELECT_WEAPON__, 255+(95<<8)
     },

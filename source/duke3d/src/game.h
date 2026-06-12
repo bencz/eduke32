@@ -267,6 +267,7 @@ typedef struct {
     char overhead_on,last_overhead,showweapons;
     char god,warp_on,cashman,eog,showallmap;
     char show_help,scrollmode,noclip;
+    char infinite_ammo;
     char ridecule[MAXRIDECULE][MAXRIDECULELENGTH];
     char pwlockout[MAXPWLOCKOUT],rtsname[MAXRTSNAME];
     char display_bonus_screen;

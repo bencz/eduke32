@@ -2058,7 +2058,8 @@ static void P_FireWeapon(int playerNum)
 
     if (PWEAPON(playerNum, pPlayer->curr_weapon, WorksLike) != KNEE_WEAPON)
     {
-        pPlayer->ammo_amount[pPlayer->curr_weapon]--;
+        if (!ud.infinite_ammo)
+            pPlayer->ammo_amount[pPlayer->curr_weapon]--;
         P_DoWeaponRumble(playerNum);
     }
 
@@ -2088,7 +2089,8 @@ static void P_FireWeapon(int playerNum)
         }
         else
         {
-            if (PWEAPON(playerNum, pPlayer->curr_weapon, Flags) & WEAPON_AMMOPERSHOT &&
+            if (!ud.infinite_ammo &&
+                PWEAPON(playerNum, pPlayer->curr_weapon, Flags) & WEAPON_AMMOPERSHOT &&
                 PWEAPON(playerNum, pPlayer->curr_weapon, WorksLike) != KNEE_WEAPON)
             {
                 if (pPlayer->ammo_amount[pPlayer->curr_weapon] > 0)
@@ -4246,7 +4248,8 @@ static void P_ProcessWeapon(int playerNum)
             {
                 int const weap = pPlayer->curr_weapon, clipcnt = PWEAPON(playerNum, weap, Clip);
 
-                if (pPlayer->ammo_amount[weap] > clipcnt && (pPlayer->ammo_amount[weap] % clipcnt) != 0)
+                if (!ud.infinite_ammo &&
+                    pPlayer->ammo_amount[weap] > clipcnt && (pPlayer->ammo_amount[weap] % clipcnt) != 0)
                 {
                     pPlayer->ammo_amount[weap] -= pPlayer->ammo_amount[weap] % clipcnt;
                     *weaponFrame                = PWEAPON(playerNum, weap, TotalTime);
@@ -4286,7 +4289,8 @@ static void P_ProcessWeapon(int playerNum)
         actor[pPlayer->i].t_data[7]--;
         if (pPlayer->last_weapon == -1 && actor[pPlayer->i].t_data[7] != 0 && ((actor[pPlayer->i].t_data[7] & 1) == 0))
         {
-            if (PWEAPON(playerNum, pPlayer->curr_weapon, Flags) & WEAPON_AMMOPERSHOT)
+            if (!ud.infinite_ammo &&
+                PWEAPON(playerNum, pPlayer->curr_weapon, Flags) & WEAPON_AMMOPERSHOT)
             {
                 if (pPlayer->ammo_amount[pPlayer->curr_weapon] > 0)
                     pPlayer->ammo_amount[pPlayer->curr_weapon]--;
@@ -4483,7 +4487,8 @@ static void P_ProcessWeapon(int playerNum)
 
             if (++(*weaponFrame) == PWEAPON(playerNum, pPlayer->curr_weapon, HoldDelay))
             {
-                pPlayer->ammo_amount[pPlayer->curr_weapon]--;
+                if (!ud.infinite_ammo)
+                    pPlayer->ammo_amount[pPlayer->curr_weapon]--;
 
                 if (numplayers < 2 || g_netServer)
                 {

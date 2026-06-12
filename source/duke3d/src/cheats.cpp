@@ -55,6 +55,7 @@ char CheatStrings [NUMCHEATS][MAXCHEATLEN] =
     "debug",        // 24
     "<RESERVED>",   // 25
     "cgs",          // 26
+    "ammo",         // 27 - infinite ammo toggle
 #endif
 };
 
@@ -87,6 +88,7 @@ char CheatDescriptions[NUMCHEATS][MAXCHEATDESC] =
     "Toggle Debug Data Dump",
     "", // <RESERVED>
     "", // cgs
+    "Toggle Infinite Ammo",
 };
 
 const uint32_t CheatFunctionFlags [NUMCHEATS] =
@@ -118,6 +120,7 @@ const uint32_t CheatFunctionFlags [NUMCHEATS] =
     1 << CHEATFUNC_DEBUG,
     0,
     (1 << CHEATFUNC_GOD) | (1 << CHEATFUNC_GIVEEVERYTHING),
+    1 << CHEATFUNC_AMMO,
 };
 
 // KEEPINSYNC cheats.h: enum CheatCodeFunctions
@@ -145,6 +148,7 @@ const uint8_t CheatFunctionIDs[NUMCHEATS] =
     CHEAT_ALLEN,
     CHEAT_COORDS,
     CHEAT_DEBUG,
+    CHEAT_AMMO,
 };
 
 #ifndef EDUKE32_STANDALONE
@@ -263,6 +267,9 @@ void G_DoCheats(void)
     {
         cheatNum = osdcmd_cheatsinfo_stat.cheatnum;
 
+        // Cheats are allowed on every skill, including "Damn I'm Good".
+        // The original code blocked most cheats when ud.player_skill == 4; disabled here.
+#if 0
         if (!FURY && ud.player_skill == 4)
         {
             switch (cheatNum)
@@ -280,6 +287,7 @@ void G_DoCheats(void)
                 return;
             }
         }
+#endif
 
         // JBF 20030914
         osdcmd_cheatsinfo_stat.cheatnum = -1;
@@ -701,6 +709,24 @@ void G_DoCheats(void)
                     return;
                 }
 
+                case CHEAT_AMMO:
+                {
+                    ud.infinite_ammo = !ud.infinite_ammo;
+
+                    if (ud.infinite_ammo)
+                    {
+                        int const weaponLimit = (VOLUMEONE) ? SHRINKER_WEAPON : MAX_WEAPONS;
+                        for (bssize_t weaponNum = PISTOL_WEAPON; weaponNum < weaponLimit; weaponNum++)
+                            P_AddAmmo(pPlayer, weaponNum, pPlayer->max_ammo_amount[weaponNum]);
+                    }
+
+                    Bsprintf(apStrings[QUOTE_RESERVED4], "Infinite Ammo: %s", ud.infinite_ammo ? "ON" : "OFF");
+                    P_DoQuote(QUOTE_RESERVED4, pPlayer);
+
+                    end_cheat(pPlayer);
+                    return;
+                }
+
                 case CHEAT_RESERVED:
                 case CHEAT_RESERVED3:
                     ud.eog = 1;
@@ -732,12 +758,7 @@ void G_DoCheats(void)
         {
             if (pPlayer->cheat_phase == -1)
             {
-                if (!FURY && ud.player_skill == 4)
-                {
-                    P_DoQuote(QUOTE_CHEATS_DISABLED, pPlayer);
-                    pPlayer->cheat_phase = 0;
-                }
-                else
+                // Allow typing cheat codes on every skill, even "Damn I'm Good".
                 {
                     pPlayer->cheat_phase = 1;
                     //                    P_DoQuote(QUOTE_25,pPlayer);
