@@ -57,6 +57,7 @@ char CheatStrings [NUMCHEATS][MAXCHEATLEN] =
     "cgs",          // 26
     "ammo",         // 27 - infinite ammo toggle
     "magnet",       // 28 - teleport every monster to the player
+    "fastweapons",  // 29 - toggle rapid-fire pistol, shotgun and RPG
 #endif
 };
 
@@ -91,6 +92,7 @@ char CheatDescriptions[NUMCHEATS][MAXCHEATDESC] =
     "", // cgs
     "Toggle Infinite Ammo",
     "Teleport All Monsters To You",
+    "Toggle Fast Weapons",
 };
 
 const uint32_t CheatFunctionFlags [NUMCHEATS] =
@@ -124,6 +126,7 @@ const uint32_t CheatFunctionFlags [NUMCHEATS] =
     (1 << CHEATFUNC_GOD) | (1 << CHEATFUNC_GIVEEVERYTHING),
     1 << CHEATFUNC_AMMO,
     1 << CHEATFUNC_MAGNET,
+    1 << CHEATFUNC_FASTWEAPONS,
 };
 
 // KEEPINSYNC cheats.h: enum CheatCodeFunctions
@@ -153,6 +156,7 @@ const uint8_t CheatFunctionIDs[NUMCHEATS] =
     CHEAT_DEBUG,
     CHEAT_AMMO,
     CHEAT_MAGNET,
+    CHEAT_FASTWEAPONS,
 };
 
 #ifndef EDUKE32_STANDALONE
@@ -261,11 +265,8 @@ static void end_cheat(DukePlayer_t * const pPlayer)
 int g_cheatBufLen;
 static int8_t cheatbuf[MAXCHEATLEN];
 
-// Force every pending RESPAWN marker that would spawn a monster to fire RIGHT
-// NOW, so trigger-spawned enemies (map RESPAWN markers, plus the "Damn I'm Good"
-// delayed corpse-respawns) actually exist as sprites. Used by the "magnet" cheat
-// so its one-shot pull can grab those too, instead of missing enemies that a
-// trigger hadn't created yet.
+// Force every pending map RESPAWN marker that would spawn a monster to fire
+// immediately, so the one-shot magnet can grab trigger-spawned enemies too.
 static int G_TriggerAllSpawns(void)
 {
     int spawnedCount = 0;
@@ -285,6 +286,37 @@ static int G_TriggerAllSpawns(void)
     }
 
     return spawnedCount;
+}
+
+static bool G_FastWeaponsEnabled(int const playerNum)
+{
+    return PWEAPON(playerNum, PISTOL_WEAPON, FireDelay) == 1
+        && PWEAPON(playerNum, PISTOL_WEAPON, TotalTime) == 2
+        && PWEAPON(playerNum, PISTOL_WEAPON, Flags) == WEAPON_AUTOMATIC
+        && PWEAPON(playerNum, SHOTGUN_WEAPON, FireDelay) == 1
+        && PWEAPON(playerNum, SHOTGUN_WEAPON, TotalTime) == 2
+        && PWEAPON(playerNum, SHOTGUN_WEAPON, Flags) == (WEAPON_AUTOMATIC | WEAPON_SPAWNTYPE3)
+        && PWEAPON(playerNum, RPG_WEAPON, FireDelay) == 1
+        && PWEAPON(playerNum, RPG_WEAPON, TotalTime) == 2
+        && PWEAPON(playerNum, RPG_WEAPON, Flags) == WEAPON_AUTOMATIC;
+}
+
+static void G_SetFastWeapons(int const playerNum, bool const enabled)
+{
+    PWEAPON(playerNum, PISTOL_WEAPON, Clip)      = enabled ? 0 : 12;
+    PWEAPON(playerNum, PISTOL_WEAPON, Reload)    = enabled ? 0 : 27;
+    PWEAPON(playerNum, PISTOL_WEAPON, FireDelay) = enabled ? 1 : 2;
+    PWEAPON(playerNum, PISTOL_WEAPON, TotalTime) = enabled ? 2 : 5;
+    PWEAPON(playerNum, PISTOL_WEAPON, Flags)     = enabled ? WEAPON_AUTOMATIC : WEAPON_RELOAD_TIMING;
+
+    PWEAPON(playerNum, SHOTGUN_WEAPON, Reload)    = enabled ? 0 : 13;
+    PWEAPON(playerNum, SHOTGUN_WEAPON, FireDelay) = enabled ? 1 : 4;
+    PWEAPON(playerNum, SHOTGUN_WEAPON, TotalTime) = enabled ? 2 : 30;
+    PWEAPON(playerNum, SHOTGUN_WEAPON, Flags)     = enabled ? WEAPON_AUTOMATIC | WEAPON_SPAWNTYPE3 : WEAPON_CHECKATRELOAD;
+
+    PWEAPON(playerNum, RPG_WEAPON, FireDelay) = enabled ? 1 : 4;
+    PWEAPON(playerNum, RPG_WEAPON, TotalTime) = enabled ? 2 : 20;
+    PWEAPON(playerNum, RPG_WEAPON, Flags)     = enabled ? WEAPON_AUTOMATIC : 0;
 }
 
 void G_DoCheats(void)
@@ -803,6 +835,18 @@ void G_DoCheats(void)
                     }
 
                     Bsprintf(apStrings[QUOTE_RESERVED4], "Pulled %d Monsters To You", monsterCount);
+                    P_DoQuote(QUOTE_RESERVED4, pPlayer);
+
+                    end_cheat(pPlayer);
+                    return;
+                }
+
+                case CHEAT_FASTWEAPONS:
+                {
+                    bool const enable = !G_FastWeaponsEnabled(myconnectindex);
+                    G_SetFastWeapons(myconnectindex, enable);
+
+                    Bsprintf(apStrings[QUOTE_RESERVED4], "Fast Weapons: %s", enable ? "ON" : "OFF");
                     P_DoQuote(QUOTE_RESERVED4, pPlayer);
 
                     end_cheat(pPlayer);

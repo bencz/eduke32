@@ -767,6 +767,7 @@ static MenuEntry_t ME_CheatCodes[] = {
     MAKE_MENUCHEAT( CheatDescriptions[CHEAT_DEBUG] ),
     MAKE_MENUCHEAT( CheatDescriptions[CHEAT_AMMO] ),
     MAKE_MENUCHEAT( CheatDescriptions[CHEAT_MAGNET] ),
+    MAKE_MENUCHEAT( CheatDescriptions[CHEAT_FASTWEAPONS] ),
 };
 
 static MenuEntry_t *MEL_OPTIONS[] = {

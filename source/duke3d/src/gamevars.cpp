@@ -1500,15 +1500,15 @@ static weapondata_t weapondefaults[MAX_WEAPONS] = {
     },
 
     {
-        PISTOL_WEAPON, 0, 0, 1, 2, 0,
-        WEAPON_AUTOMATIC,
+        PISTOL_WEAPON, 12, 27, 2, 5, 0,
+        WEAPON_RELOAD_TIMING,
         SHOTSPARK1__, 2, SHELL__, 0, 0, PISTOL_FIRE__, 0, 0,
         EJECT_CLIP__, INSERT_CLIP__, INSERT_CLIP__, 255+(95<<8)
     },
 
     {
-        SHOTGUN_WEAPON, 0, 0, 1, 2, 0,
-        WEAPON_AUTOMATIC | WEAPON_SPAWNTYPE3,
+        SHOTGUN_WEAPON, 0, 13, 4, 30, 0,
+        WEAPON_CHECKATRELOAD,
         SHOTGUN__, 24, SHOTGUNSHELL__, 7, 0, SHOTGUN_FIRE__, 15, SHOTGUN_COCK__,
         EJECT_CLIP__, INSERT_CLIP__, SHOTGUN_COCK__, 255+(95<<8)
     },
@@ -1521,10 +1521,8 @@ static weapondata_t weapondefaults[MAX_WEAPONS] = {
     },
 
     {
-        // Rapid-fire RPG. FireDelay/TotalTime slashed (was 4/20) and
-        // WEAPON_AUTOMATIC added so holding fire launches rockets in fast succession.
-        RPG_WEAPON, 0, 0, 1, 2, 0,
-        WEAPON_AUTOMATIC,
+        RPG_WEAPON, 0, 0, 4, 20, 0,
+        0,
         RPG__, 0, 0, 0, 0, 0, 0, 0,
         EJECT_CLIP__, INSERT_CLIP__, SELECT_WEAPON__, 255+(95<<8)
     },
