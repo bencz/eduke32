@@ -57,7 +57,10 @@ char CheatStrings [NUMCHEATS][MAXCHEATLEN] =
     "cgs",          // 26
     "ammo",         // 27 - infinite ammo toggle
     "magnet",       // 28 - teleport every monster to the player
-    "fastweapons",  // 29 - toggle rapid-fire pistol, shotgun and RPG
+    "fastweapons",  // 29 - toggle rapid-fire weapons (except pipebomb)
+    "regen",        // 30 - gradual health regeneration
+    "boom",         // 31 - explosive bullet impacts
+    "berserk",      // 32 - extremely powerful kicks
 #endif
 };
 
@@ -93,6 +96,9 @@ char CheatDescriptions[NUMCHEATS][MAXCHEATDESC] =
     "Toggle Infinite Ammo",
     "Teleport All Monsters To You",
     "Toggle Fast Weapons",
+    "Toggle Health Regeneration",
+    "Toggle Explosive Bullets",
+    "Toggle Berserk Kicks",
 };
 
 const uint32_t CheatFunctionFlags [NUMCHEATS] =
@@ -127,6 +133,9 @@ const uint32_t CheatFunctionFlags [NUMCHEATS] =
     1 << CHEATFUNC_AMMO,
     1 << CHEATFUNC_MAGNET,
     1 << CHEATFUNC_FASTWEAPONS,
+    1 << CHEATFUNC_REGEN,
+    1 << CHEATFUNC_BOOM,
+    1 << CHEATFUNC_BERSERK,
 };
 
 // KEEPINSYNC cheats.h: enum CheatCodeFunctions
@@ -157,6 +166,9 @@ const uint8_t CheatFunctionIDs[NUMCHEATS] =
     CHEAT_AMMO,
     CHEAT_MAGNET,
     CHEAT_FASTWEAPONS,
+    CHEAT_REGEN,
+    CHEAT_BOOM,
+    CHEAT_BERSERK,
 };
 
 #ifndef EDUKE32_STANDALONE
@@ -264,6 +276,48 @@ static void end_cheat(DukePlayer_t * const pPlayer)
 
 int g_cheatBufLen;
 static int8_t cheatbuf[MAXCHEATLEN];
+
+struct gameplaycheatstate_t
+{
+    bool regen;
+    bool boom;
+    bool berserk;
+    int regenClock;
+};
+
+static gameplaycheatstate_t g_gameplayCheatState[MAXPLAYERS];
+
+bool G_CheatBoomEnabled(int const playerNum)
+{
+    return (unsigned)playerNum < MAXPLAYERS && g_gameplayCheatState[playerNum].boom;
+}
+
+bool G_CheatBerserkEnabled(int const playerNum)
+{
+    return (unsigned)playerNum < MAXPLAYERS && g_gameplayCheatState[playerNum].berserk;
+}
+
+void G_UpdatePlayerCheats(int const playerNum)
+{
+    if ((unsigned)playerNum >= MAXPLAYERS)
+        return;
+
+    auto & state = g_gameplayCheatState[playerNum];
+    auto const pPlayer = g_player[playerNum].ps;
+    auto const pSprite = &sprite[pPlayer->i];
+
+    if (!state.regen || pSprite->extra <= 0 || pSprite->extra >= pPlayer->max_player_health)
+    {
+        state.regenClock = 0;
+        return;
+    }
+
+    if (++state.regenClock >= GAMETICSPERSEC * 3)
+    {
+        pSprite->extra = min<int>(pSprite->extra + 1, pPlayer->max_player_health);
+        state.regenClock = 0;
+    }
+}
 
 // Force every pending map RESPAWN marker that would spawn a monster to fire
 // immediately, so the one-shot magnet can grab trigger-spawned enemies too.
@@ -911,6 +965,43 @@ void G_DoCheats(void)
                     G_SetFastWeapons(myconnectindex, enable);
 
                     Bsprintf(apStrings[QUOTE_RESERVED4], "Fast Weapons: %s", enable ? "ON" : "OFF");
+                    P_DoQuote(QUOTE_RESERVED4, pPlayer);
+
+                    end_cheat(pPlayer);
+                    return;
+                }
+
+                case CHEAT_REGEN:
+                {
+                    auto & state = g_gameplayCheatState[myconnectindex];
+                    state.regen = !state.regen;
+                    state.regenClock = 0;
+
+                    Bsprintf(apStrings[QUOTE_RESERVED4], "Health Regeneration: %s", state.regen ? "ON" : "OFF");
+                    P_DoQuote(QUOTE_RESERVED4, pPlayer);
+
+                    end_cheat(pPlayer);
+                    return;
+                }
+
+                case CHEAT_BOOM:
+                {
+                    auto & enabled = g_gameplayCheatState[myconnectindex].boom;
+                    enabled = !enabled;
+
+                    Bsprintf(apStrings[QUOTE_RESERVED4], "Explosive Bullets: %s", enabled ? "ON" : "OFF");
+                    P_DoQuote(QUOTE_RESERVED4, pPlayer);
+
+                    end_cheat(pPlayer);
+                    return;
+                }
+
+                case CHEAT_BERSERK:
+                {
+                    auto & enabled = g_gameplayCheatState[myconnectindex].berserk;
+                    enabled = !enabled;
+
+                    Bsprintf(apStrings[QUOTE_RESERVED4], "Berserk Kicks: %s", enabled ? "ON" : "OFF");
                     P_DoQuote(QUOTE_RESERVED4, pPlayer);
 
                     end_cheat(pPlayer);

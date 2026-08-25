@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 //-------------------------------------------------------------------------
 
+#include "cheats.h"
 #include "demo.h"
 #include "duke3d.h"
 #include "enet.h"
@@ -657,6 +658,26 @@ static int P_PostFireHitscan(int playerNum, int const spriteNum, hitdata_t *cons
     UNREFERENCED_PARAMETER(playerNum);
     UNREFERENCED_CONST_PARAMETER(spriteOwner);
 #endif
+    if (playerNum >= 0 && G_CheatBoomEnabled(playerNum) && hitData->sect >= 0)
+    {
+        switch (tileGetMapping(projecTile))
+        {
+            case SHOTSPARK1__:
+            case SHOTGUN__:
+            case CHAINGUN__:
+            {
+                int const explosionSprite = A_Spawn(spriteNum, EXPLOSION2);
+                sprite[explosionSprite].xrepeat = sprite[explosionSprite].yrepeat = 16;
+                A_PlaySound(PIPEBOMB_EXPLODE, explosionSprite);
+                A_RadiusDamage(spriteNum, 512, 4, 6, 8, 10);
+                break;
+            }
+
+            default:
+                break;
+        }
+    }
+
     if (hitData->wall == -1 && hitData->sprite == -1)
     {
         if (Proj_MaybeDamageCF2(spriteNum, zvel, hitData->sect))
@@ -857,6 +878,9 @@ static void Proj_HandleKnee(hitdata_t *const hitData, int const spriteNum, int c
 
     if (pPlayer != NULL && pPlayer->inv_amount[GET_STEROIDS] > 0 && pPlayer->inv_amount[GET_STEROIDS] < 400)
         sprite[kneeSprite].extra += (pPlayer->max_player_health>>2);
+
+    if (pPlayer != NULL && G_CheatBerserkEnabled(playerNum))
+        sprite[kneeSprite].extra = max<int>(pPlayer->max_player_health, sprite[kneeSprite].extra * 10);
 
     int const dmg = clamp<int>(sprite[kneeSprite].extra, FF_WEAPON_DMG_MIN, FF_WEAPON_DMG_MAX);
 
@@ -5188,6 +5212,8 @@ void P_ProcessInput(int playerNum)
         pSprite->extra                  = 0;
         pPlayer->inv_amount[GET_SHIELD] = 0;
     }
+
+    G_UpdatePlayerCheats(playerNum);
 
     pPlayer->last_extra = pSprite->extra;
     pPlayer->loogcnt    = (pPlayer->loogcnt > 0) ? pPlayer->loogcnt - 1 : 0;

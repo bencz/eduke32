@@ -62,6 +62,9 @@ enum cheatindex_t
     CHEAT_AMMO,
     CHEAT_MAGNET,  // teleport every monster to the player
     CHEAT_FASTWEAPONS,
+    CHEAT_REGEN,
+    CHEAT_BOOM,
+    CHEAT_BERSERK,
     NUMCHEATS,
 };
 
@@ -96,5 +99,12 @@ enum CheatCodeFunctions
     CHEATFUNC_AMMO,  // infinite ammo toggle
     CHEATFUNC_MAGNET,  // teleport every monster to the player
     CHEATFUNC_FASTWEAPONS,
+    CHEATFUNC_REGEN,
+    CHEATFUNC_BOOM,
+    CHEATFUNC_BERSERK,
     NUMCHEATFUNCS,
 };
+
+bool G_CheatBoomEnabled(int playerNum);
+bool G_CheatBerserkEnabled(int playerNum);
+void G_UpdatePlayerCheats(int playerNum);
