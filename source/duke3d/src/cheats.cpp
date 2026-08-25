@@ -288,35 +288,99 @@ static int G_TriggerAllSpawns(void)
     return spawnedCount;
 }
 
+struct fastweaponsettings_t
+{
+    int32_t clip;
+    int32_t reload;
+    int32_t fireDelay;
+    int32_t totalTime;
+    int32_t holdDelay;
+    int32_t flags;
+};
+
+struct fastweaponstate_t
+{
+    bool active;
+    intptr_t clip[MAX_WEAPONS];
+    intptr_t reload[MAX_WEAPONS];
+    intptr_t fireDelay[MAX_WEAPONS];
+    intptr_t totalTime[MAX_WEAPONS];
+    intptr_t holdDelay[MAX_WEAPONS];
+    intptr_t flags[MAX_WEAPONS];
+};
+
+static fastweaponstate_t g_fastWeaponState[MAXPLAYERS];
+
+static fastweaponsettings_t const g_fastWeaponSettings[MAX_WEAPONS] =
+{
+    // Clip, Reload, FireDelay, TotalTime, HoldDelay, Flags
+    { 0, 0, 1, 2, 0, WEAPON_NOVISIBLE | WEAPON_AUTOMATIC },                                      // Mighty Foot
+    { 0, 0, 1, 2, 0, WEAPON_AUTOMATIC },                                                          // Pistol
+    { 0, 0, 1, 2, 0, WEAPON_AUTOMATIC | WEAPON_SPAWNTYPE3 },                                      // Shotgun
+    { 0, 0, 1, 2, 0, WEAPON_AUTOMATIC | WEAPON_AMMOPERSHOT | WEAPON_SPAWNTYPE3 },                 // Chaingun
+    { 0, 0, 1, 2, 0, WEAPON_AUTOMATIC },                                                          // RPG
+    { 0, 0, 0, 0, 0, 0 },                                                                          // Pipebomb (kept unchanged)
+    { 0, 0, 1, 2, 0, WEAPON_GLOWS | WEAPON_AUTOMATIC },                                           // Shrinker
+    { 0, 0, 1, 2, 0, WEAPON_AUTOMATIC | WEAPON_AMMOPERSHOT },                                     // Devastator
+    { 0, 2, 1, 2, 0, WEAPON_NOVISIBLE | WEAPON_STANDSTILL | WEAPON_CHECKATRELOAD },               // Tripbomb
+    { 0, 0, 1, 2, 0, WEAPON_RESET },                                                              // Freezer
+    { 0, 0, 1, 2, 0, WEAPON_BOMB_TRIGGER | WEAPON_NOVISIBLE },                                    // Remote detonator
+    { 0, 0, 1, 2, 0, WEAPON_GLOWS | WEAPON_AUTOMATIC },                                           // Expander
+    { 0, 0, 1, 2, 0, WEAPON_RESET },                                                              // Incinerator
+};
+
 static bool G_FastWeaponsEnabled(int const playerNum)
 {
-    return PWEAPON(playerNum, PISTOL_WEAPON, FireDelay) == 1
-        && PWEAPON(playerNum, PISTOL_WEAPON, TotalTime) == 2
-        && PWEAPON(playerNum, PISTOL_WEAPON, Flags) == WEAPON_AUTOMATIC
-        && PWEAPON(playerNum, SHOTGUN_WEAPON, FireDelay) == 1
-        && PWEAPON(playerNum, SHOTGUN_WEAPON, TotalTime) == 2
-        && PWEAPON(playerNum, SHOTGUN_WEAPON, Flags) == (WEAPON_AUTOMATIC | WEAPON_SPAWNTYPE3)
-        && PWEAPON(playerNum, RPG_WEAPON, FireDelay) == 1
-        && PWEAPON(playerNum, RPG_WEAPON, TotalTime) == 2
-        && PWEAPON(playerNum, RPG_WEAPON, Flags) == WEAPON_AUTOMATIC;
+    return g_fastWeaponState[playerNum].active;
 }
 
 static void G_SetFastWeapons(int const playerNum, bool const enabled)
 {
-    PWEAPON(playerNum, PISTOL_WEAPON, Clip)      = enabled ? 0 : 12;
-    PWEAPON(playerNum, PISTOL_WEAPON, Reload)    = enabled ? 0 : 27;
-    PWEAPON(playerNum, PISTOL_WEAPON, FireDelay) = enabled ? 1 : 2;
-    PWEAPON(playerNum, PISTOL_WEAPON, TotalTime) = enabled ? 2 : 5;
-    PWEAPON(playerNum, PISTOL_WEAPON, Flags)     = enabled ? WEAPON_AUTOMATIC : WEAPON_RELOAD_TIMING;
+    auto & state = g_fastWeaponState[playerNum];
 
-    PWEAPON(playerNum, SHOTGUN_WEAPON, Reload)    = enabled ? 0 : 13;
-    PWEAPON(playerNum, SHOTGUN_WEAPON, FireDelay) = enabled ? 1 : 4;
-    PWEAPON(playerNum, SHOTGUN_WEAPON, TotalTime) = enabled ? 2 : 30;
-    PWEAPON(playerNum, SHOTGUN_WEAPON, Flags)     = enabled ? WEAPON_AUTOMATIC | WEAPON_SPAWNTYPE3 : WEAPON_CHECKATRELOAD;
+    if (enabled)
+    {
+        for (int weaponNum = 0; weaponNum < MAX_WEAPONS; ++weaponNum)
+        {
+            state.clip[weaponNum]      = PWEAPON(playerNum, weaponNum, Clip);
+            state.reload[weaponNum]    = PWEAPON(playerNum, weaponNum, Reload);
+            state.fireDelay[weaponNum] = PWEAPON(playerNum, weaponNum, FireDelay);
+            state.totalTime[weaponNum] = PWEAPON(playerNum, weaponNum, TotalTime);
+            state.holdDelay[weaponNum] = PWEAPON(playerNum, weaponNum, HoldDelay);
+            state.flags[weaponNum]     = PWEAPON(playerNum, weaponNum, Flags);
 
-    PWEAPON(playerNum, RPG_WEAPON, FireDelay) = enabled ? 1 : 4;
-    PWEAPON(playerNum, RPG_WEAPON, TotalTime) = enabled ? 2 : 20;
-    PWEAPON(playerNum, RPG_WEAPON, Flags)     = enabled ? WEAPON_AUTOMATIC : 0;
+            // Preserve the complete pipebomb timing so holding the fire button
+            // continues to control the throwing distance exactly as normal.
+            if (weaponNum == HANDBOMB_WEAPON)
+                continue;
+
+            auto const & fast = g_fastWeaponSettings[weaponNum];
+            PWEAPON(playerNum, weaponNum, Clip)      = fast.clip;
+            PWEAPON(playerNum, weaponNum, Reload)    = fast.reload;
+            PWEAPON(playerNum, weaponNum, FireDelay) = fast.fireDelay;
+            PWEAPON(playerNum, weaponNum, TotalTime) = fast.totalTime;
+            PWEAPON(playerNum, weaponNum, HoldDelay) = fast.holdDelay;
+            PWEAPON(playerNum, weaponNum, Flags)     = fast.flags;
+        }
+
+        state.active = true;
+        return;
+    }
+
+    if (!state.active)
+        return;
+
+    for (int weaponNum = 0; weaponNum < MAX_WEAPONS; ++weaponNum)
+    {
+        PWEAPON(playerNum, weaponNum, Clip)      = state.clip[weaponNum];
+        PWEAPON(playerNum, weaponNum, Reload)    = state.reload[weaponNum];
+        PWEAPON(playerNum, weaponNum, FireDelay) = state.fireDelay[weaponNum];
+        PWEAPON(playerNum, weaponNum, TotalTime) = state.totalTime[weaponNum];
+        PWEAPON(playerNum, weaponNum, HoldDelay) = state.holdDelay[weaponNum];
+        PWEAPON(playerNum, weaponNum, Flags)     = state.flags[weaponNum];
+    }
+
+    state.active = false;
 }
 
 void G_DoCheats(void)
