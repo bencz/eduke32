@@ -7070,7 +7070,14 @@ void A_Execute(int const spriteNum, int const playerNum, int const playerDist)
         }
 #endif
     }
-    else VM_DeleteSprite(spriteNum, playerNum);
+    else
+    {
+        // "Damn I'm Good": this enemy is about to be deleted (gibbed/exploded),
+        // so it leaves no corpse for the native respawn. Plant a respawn marker
+        // at its death spot first, so it comes back right there with the star.
+        G_DigRespawnKilledEnemy(spriteNum);
+        VM_DeleteSprite(spriteNum, playerNum);
+    }
 
     // g_frameJustDrawn is set by G_DrawFrame() (and thus by the coroutine)
     // it isn't cleared until the next game tic is processed.

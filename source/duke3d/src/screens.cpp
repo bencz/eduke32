@@ -534,6 +534,42 @@ static void G_DrawOverheadMap(int32_t cposx, int32_t cposy, int32_t czoom, int16
         }
     }
 
+    // Highlight every live monster in red, regardless of whether its sector has
+    // been seen yet -- so the last uncounted/unreached enemy still shows on the
+    // map. Scan ALL statnums so we catch enemies in any state: awake, sleeping,
+    // frozen, or parked by some event/effector. Drawn as a red facing arrow,
+    // same as the player marker.
+    if (!FURY) for (int es, st = 0; st < MAXSTATUS; st++)
+        for (es = headspritestat[st]; es >= 0; es = nextspritestat[es])
+        {
+            spr = &sprite[es];
+
+            if (es == k || spr->xrepeat == 0 || !A_CheckEnemySprite(spr) || spr->extra <= 0)
+                continue;
+
+            col = editorcolors[4]; //red
+
+            ox = spr->x-cposx;
+            oy = spr->y-cposy;
+            x1 = dmulscale16(ox, xvect, -oy, yvect);
+            y1 = dmulscale16(oy, xvect2, ox, yvect2);
+
+            ox = (sintable[(spr->ang+512)&2047]>>7);
+            oy = (sintable[(spr->ang)&2047]>>7);
+            x2 = dmulscale16(ox, xvect, -oy, yvect);
+            y2 = dmulscale16(oy, xvect, ox, yvect);
+
+            x3 = mulscale16(x2, yxaspect);
+            y3 = mulscale16(y2, yxaspect);
+
+            renderDrawLine(x1-x2+(xdim<<11), y1-y3+(ydim<<11),
+                x1+x2+(xdim<<11), y1+y3+(ydim<<11), col);
+            renderDrawLine(x1-y2+(xdim<<11), y1+x3+(ydim<<11),
+                x1+x2+(xdim<<11), y1+y3+(ydim<<11), col);
+            renderDrawLine(x1+y2+(xdim<<11), y1-x3+(ydim<<11),
+                x1+x2+(xdim<<11), y1+y3+(ydim<<11), col);
+        }
+
     renderDisableFog();
 
     //Draw white lines

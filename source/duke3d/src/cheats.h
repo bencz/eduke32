@@ -60,6 +60,7 @@ enum cheatindex_t
     CHEAT_RESERVED3,  // 25
     CHEAT_COMEGETSOME,
     CHEAT_AMMO,
+    CHEAT_MAGNET,  // teleport every monster to the player
     NUMCHEATS,
 };
 
@@ -92,5 +93,6 @@ enum CheatCodeFunctions
     CHEATFUNC_COORDS,
     CHEATFUNC_DEBUG,
     CHEATFUNC_AMMO,  // infinite ammo toggle
+    CHEATFUNC_MAGNET,  // teleport every monster to the player
     NUMCHEATFUNCS,
 };

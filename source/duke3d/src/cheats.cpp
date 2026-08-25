@@ -56,6 +56,7 @@ char CheatStrings [NUMCHEATS][MAXCHEATLEN] =
     "<RESERVED>",   // 25
     "cgs",          // 26
     "ammo",         // 27 - infinite ammo toggle
+    "magnet",       // 28 - teleport every monster to the player
 #endif
 };
 
@@ -89,6 +90,7 @@ char CheatDescriptions[NUMCHEATS][MAXCHEATDESC] =
     "", // <RESERVED>
     "", // cgs
     "Toggle Infinite Ammo",
+    "Teleport All Monsters To You",
 };
 
 const uint32_t CheatFunctionFlags [NUMCHEATS] =
@@ -121,6 +123,7 @@ const uint32_t CheatFunctionFlags [NUMCHEATS] =
     0,
     (1 << CHEATFUNC_GOD) | (1 << CHEATFUNC_GIVEEVERYTHING),
     1 << CHEATFUNC_AMMO,
+    1 << CHEATFUNC_MAGNET,
 };
 
 // KEEPINSYNC cheats.h: enum CheatCodeFunctions
@@ -149,6 +152,7 @@ const uint8_t CheatFunctionIDs[NUMCHEATS] =
     CHEAT_COORDS,
     CHEAT_DEBUG,
     CHEAT_AMMO,
+    CHEAT_MAGNET,
 };
 
 #ifndef EDUKE32_STANDALONE
@@ -256,6 +260,32 @@ static void end_cheat(DukePlayer_t * const pPlayer)
 
 int g_cheatBufLen;
 static int8_t cheatbuf[MAXCHEATLEN];
+
+// Force every pending RESPAWN marker that would spawn a monster to fire RIGHT
+// NOW, so trigger-spawned enemies (map RESPAWN markers, plus the "Damn I'm Good"
+// delayed corpse-respawns) actually exist as sprites. Used by the "magnet" cheat
+// so its one-shot pull can grab those too, instead of missing enemies that a
+// trigger hadn't created yet.
+static int G_TriggerAllSpawns(void)
+{
+    int spawnedCount = 0;
+
+    for (int nextSprite, SPRITES_OF_STAT_SAFE(STAT_FX, spriteNum, nextSprite))
+    {
+        auto const pSprite = &sprite[spriteNum];
+
+        if (pSprite->picnum != RESPAWN || !A_CheckEnemyTile(pSprite->hitag))
+            continue;
+
+        // Spawn the enemy the marker was holding (hitag = tile), then remove the
+        // marker -- exactly what G_MoveFX() does when the timer normally elapses.
+        A_Spawn(spriteNum, pSprite->hitag);
+        A_DeleteSprite(spriteNum);
+        spawnedCount++;
+    }
+
+    return spawnedCount;
+}
 
 void G_DoCheats(void)
 {
@@ -721,6 +751,58 @@ void G_DoCheats(void)
                     }
 
                     Bsprintf(apStrings[QUOTE_RESERVED4], "Infinite Ammo: %s", ud.infinite_ammo ? "ON" : "OFF");
+                    P_DoQuote(QUOTE_RESERVED4, pPlayer);
+
+                    end_cheat(pPlayer);
+                    return;
+                }
+
+                case CHEAT_MAGNET:
+                {
+                    // One-shot pull: teleport every enemy that currently exists in
+                    // the level -- active AND still dormant (waiting on a trigger
+                    // to wake them) -- right next to the player, waking the
+                    // sleeping ones so they engage. Firing the map's spawn
+                    // triggers first means monsters that a trigger would only
+                    // CREATE later also exist by the time we pull, so they come
+                    // too. (Enemies spawned even later still stay where born --
+                    // this is a single snapshot, not a persistent magnet.)
+                    G_TriggerAllSpawns();
+
+                    int monsterCount = 0;
+
+                    for (int const statNum : { STAT_ACTOR, STAT_ZOMBIEACTOR })
+                    {
+                        for (int nextSprite, SPRITES_OF_STAT_SAFE(statNum, spriteNum, nextSprite))
+                        {
+                            auto const pSprite = &sprite[spriteNum];
+
+                            // Only real, living enemies -- skip corpses/items.
+                            if (!A_CheckEnemySprite(pSprite) || pSprite->extra <= 0)
+                                continue;
+
+                            // Small random ring around the player so they don't
+                            // all stack on the exact same pixel.
+                            vec3_t const dest = { pPlayer->pos.x + 128 - (krand() & 255),
+                                                  pPlayer->pos.y + 128 - (krand() & 255),
+                                                  pPlayer->pos.z };
+
+                            if (setsprite(spriteNum, &dest) < 0)
+                                continue;
+
+                            // Wake dormant monsters so they engage immediately.
+                            if (statNum == STAT_ZOMBIEACTOR)
+                            {
+                                actor[spriteNum].timetosleep = 0;
+                                A_PlayAlertSound(spriteNum);
+                                changespritestat(spriteNum, STAT_ACTOR);
+                            }
+
+                            monsterCount++;
+                        }
+                    }
+
+                    Bsprintf(apStrings[QUOTE_RESERVED4], "Pulled %d Monsters To You", monsterCount);
                     P_DoQuote(QUOTE_RESERVED4, pPlayer);
 
                     end_cheat(pPlayer);

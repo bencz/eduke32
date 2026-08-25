@@ -434,6 +434,7 @@ void G_ResetConveyorInterp(void);
 void G_ClearCameraView(DukePlayer_t *ps);
 void G_DoInterpolations(int smoothRatio);
 void G_MoveWorld(void);
+void G_DigRespawnKilledEnemy(int spriteNum);
 void G_RefreshLights(void);
 void G_StopInterpolation(const int32_t *posptr);
 

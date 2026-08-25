@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "menus.h"
 #include "savegame.h"
 #include "sbar.h"
+#include "names.h"
 
 #include "vfs.h"
 
@@ -911,6 +912,12 @@ static void P_PrepForNewLevel(int playerNum, int gameMode)
 
     g_spriteDeleteQueuePos = 0;
 
+    // Enlarge the sprite deletion queue so the many monster corpses produced by
+    // the "Damn I'm Good" flood (queued in G_MoveActors) linger for a good while
+    // before the oldest are reclaimed, instead of popping after only a handful of
+    // kills. game.con's gamestartup leaves this at 64, which is far too small.
+    g_deleteQueueSize = ARRAY_SSIZE(SpriteDeletionQueue);
+
     for (short &i : SpriteDeletionQueue)
         i = -1;
 
@@ -1275,6 +1282,130 @@ static void A_MaybeProcessEffector(int spriteNum)
     }
 }
 
+// In the "Damn I'm Good" skill (player_skill == 4) we flood the level with
+// extra copies of every enemy that shipped with the map. Bump this for even
+// more carnage.
+#define DIG_EXTRA_MONSTERS 23
+
+// Delay (in game tics, ~30/sec) between an enemy being gibbed/exploded and it
+// respawning at the death spot. Raise for a longer breather, lower for a faster
+// flood. The native finishing countdown (~12 tics) is added on top.
+#define DIG_RESPAWN_DELAY 2048
+
+// Sentinel lotag stamped on our delayed RESPAWN markers. Dying enemies call
+// G_OperateRespawns(hitag) (CON respawnhitag), which fires every RESPAWN marker
+// whose lotag matches -- and map enemies have hitag 0, so lotag-0 markers (our
+// default) were being triggered almost instantly. No enemy uses this hitag, so
+// our markers are now only ever fired by our own xvel countdown in G_MoveFX().
+#define DIG_RESPAWN_LOTAG 0x7FFF
+
+// Some tiles are flagged as enemies but are really harmless/decorative critters
+// (rats, sharks, fixed gun turrets, octabrain eggs). We must NOT multiply or
+// respawn these -- only genuine threatening monsters.
+static bool digIsFloodableEnemy(int const picnum)
+{
+    if (!A_CheckEnemyTile(picnum))
+        return false;
+
+    // Tile names aren't compile-time constants (dynamic tile remapping), so we
+    // can't switch on them -- plain comparisons it is.
+    if (picnum == RAT || picnum == SHARK || picnum == ROTATEGUN || picnum == EGG)
+        return false;
+
+    return true;
+}
+
+static void G_DuplicateEnemiesForSkill()
+{
+    if (ud.player_skill != 4 || ud.monsters_off)
+        return;
+
+    // Snapshot the map's original enemy sprites first, otherwise we would keep
+    // duplicating the copies we just inserted in an endless loop.
+    static int16_t origEnemies[MAXSPRITES];
+    int numOrig = 0;
+
+    for (int i = 0; i < MAXSPRITES; i++)
+    {
+        if (sprite[i].statnum < MAXSTATUS && digIsFloodableEnemy(sprite[i].picnum))
+            origEnemies[numOrig++] = i;
+    }
+
+    // Leave a chunk of the sprite array free so respawns, projectiles, gibs and
+    // other runtime effects still have room during the ensuing carnage.
+    int const spriteBudget = MAXSPRITES - (MAXSPRITES / 4);
+
+    for (int n = 0; n < numOrig; n++)
+    {
+        if (Numsprites >= spriteBudget)
+            break; // keep headroom for runtime spawns
+
+        auto const &src = sprite[origEnemies[n]];
+
+        for (int c = 0; c < DIG_EXTRA_MONSTERS; c++)
+        {
+            if (Numsprites >= spriteBudget)
+                break; // keep headroom for runtime spawns
+
+            int const newSprite = insertsprite(src.sectnum, src.statnum);
+            if ((unsigned)newSprite >= MAXSPRITES)
+                break; // sprite array is full, stop adding
+
+            // Copy the raw map sprite so G_SpawnAllSprites()/A_Spawn() will
+            // initialize the clone exactly like the original enemy.
+            sprite[newSprite] = src;
+
+            // Nudge the clones apart a little so they don't perfectly overlap.
+            sprite[newSprite].x += (krand() & 511) - 256;
+            sprite[newSprite].y += (krand() & 511) - 256;
+        }
+    }
+}
+
+// "Damn I'm Good": native respawn only brings back enemies that left a CORPSE
+// behind. Anything gibbed/exploded has its sprite deleted (CON guts+killit ->
+// VM_KILL -> A_DeleteSprite), so it leaves no seed and is gone for good -- which
+// is exactly why the flood "stopped" once the player started blowing everything
+// up with the RPG. To match the mode's normal respawn for these too, we plant a
+// native RESPAWN marker at the death spot just before the sprite is deleted: the
+// engine then brings the SAME monster back RIGHT THERE after the usual delay,
+// with the teleporter star. Called from A_Execute()'s deletion path.
+void G_DigRespawnKilledEnemy(int spriteNum)
+{
+    if (ud.player_skill != 4 || ud.monsters_off)
+        return;
+
+    auto const pSprite = &sprite[spriteNum];
+
+    if (!A_CheckEnemySprite(pSprite) || !digIsFloodableEnemy(pSprite->picnum))
+        return;
+
+    // Limit the respawn to the shotgun pigs (Pig Cops) only. Any other dying
+    // enemy is gone for good -- only PIGCOP and its variants come back.
+    // if (pSprite->picnum != PIGCOP && pSprite->picnum != PIGCOPSTAYPUT && pSprite->picnum != PIGCOPDIVE)
+    //   return;
+
+    // Spawn an invisible RESPAWN marker at the dying enemy's exact location.
+    // A_Spawn(RESPAWN) leaves extra at the idle value (66-13), so the native
+    // countdown in G_MoveFX() does NOT fire yet -- we gate it behind our own
+    // delay below.
+    int const marker = A_Spawn(spriteNum, RESPAWN);
+    if ((unsigned)marker >= MAXSPRITES)
+        return;
+
+    // SHT()/hitag tells G_MoveFX() which tile to respawn when the timer fires.
+    sprite[marker].hitag = pSprite->picnum;
+
+    // Stamp the sentinel lotag so other dying enemies' G_OperateRespawns() calls
+    // can't fire this marker early (that was making the respawn near-instant).
+    sprite[marker].lotag = DIG_RESPAWN_LOTAG;
+
+    // Our pre-delay (in tics) lives in xvel -- map-placed RESPAWN markers leave
+    // xvel at 0, so G_MoveFX() can tell ours apart. When it counts down to 0 it
+    // fires the teleporter star and hands off to the native finishing countdown.
+    sprite[marker].xvel = DIG_RESPAWN_DELAY;
+}
+
 static void G_SpawnAllSprites()
 {
     // I don't know why this is separated, but I have better things to do than combine them and see what happens
@@ -1377,6 +1508,7 @@ static void prelevel(int g)
     // the LOADACTOR events. DELETE_AFTER_LOADACTOR.
     G_DeleteTempEffectors();
 
+    G_DuplicateEnemiesForSkill();
     G_SpawnAllSprites();
     G_SetupRotfixedSprites();
     G_SetupLightSwitches();
@@ -1898,6 +2030,13 @@ int G_EnterLevel(int gameMode)
     ud.respawn_monsters  = ud.m_respawn_monsters;
     ud.respawn_items     = ud.m_respawn_items;
     ud.respawn_inventory = ud.m_respawn_inventory;
+
+    // "Damn I'm Good" always respawns monsters: killed enemies leave a body that
+    // the respawn system resurrects in place (reusing the same sprite slot, so it
+    // needs no free room), giving an endless stream of monsters. The menu, unlike
+    // the -s4 command line, does not set this on its own, so force it here.
+    if (ud.player_skill == 4)
+        ud.respawn_monsters = 1;
     ud.monsters_off      = ud.m_monsters_off;
     ud.coop              = ud.m_coop;
     ud.marker            = ud.m_marker;

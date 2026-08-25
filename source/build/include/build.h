@@ -58,7 +58,7 @@ enum rendmode_t {
 #if !defined GEKKO && !defined __OPENDINGUX__
 # define MAXSECTORS MAXSECTORSV8
 # define MAXWALLS MAXWALLSV8
-# define MAXSPRITES MAXSPRITESV8
+# define MAXSPRITES (MAXSPRITESV8 * 2)
 
 # define MAXXDIM 10240
 # define MAXYDIM 4320
