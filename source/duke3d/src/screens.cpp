@@ -612,6 +612,54 @@ static void G_DrawOverheadMap(int32_t cposx, int32_t cposy, int32_t czoom, int16
         }
     }
 
+    // Outline every secret area not found yet in yellow, even in sectors that
+    // have not been seen. Secrets are sectors with lotag 32767; the game clears
+    // the lotag when the player steps in, so found secrets drop off the map.
+    // A cross at the sector's center keeps tiny secret sectors visible when
+    // zoomed out. Drawn after the white lines so it stays on top.
+    {
+        int32_t const crossSize = (xdim<<12)/160;
+
+        for (i=numsectors-1; i>=0; i--)
+        {
+            if (sector[i].lotag != 32767) continue;
+
+            startwall = sector[i].wallptr;
+            endwall = sector[i].wallptr + sector[i].wallnum;
+
+            if (startwall >= endwall) continue;
+
+            int64_t sumx = 0, sumy = 0;
+
+            for (j=startwall, wal=(uwallptr_t)&wall[startwall]; j<endwall; j++, wal++)
+            {
+                sumx += wal->x;
+                sumy += wal->y;
+
+                ox = wal->x-cposx;
+                oy = wal->y-cposy;
+                x1 = dmulscale16(ox, xvect, -oy, yvect)+(xdim<<11);
+                y1 = dmulscale16(oy, xvect2, ox, yvect2)+(ydim<<11);
+
+                wal2 = (uwallptr_t)&wall[wal->point2];
+                ox = wal2->x-cposx;
+                oy = wal2->y-cposy;
+                x2 = dmulscale16(ox, xvect, -oy, yvect)+(xdim<<11);
+                y2 = dmulscale16(oy, xvect2, ox, yvect2)+(ydim<<11);
+
+                renderDrawLine(x1, y1, x2, y2, editorcolors[14]); //yellow
+            }
+
+            ox = (int32_t)(sumx/(endwall-startwall))-cposx;
+            oy = (int32_t)(sumy/(endwall-startwall))-cposy;
+            x1 = dmulscale16(ox, xvect, -oy, yvect)+(xdim<<11);
+            y1 = dmulscale16(oy, xvect2, ox, yvect2)+(ydim<<11);
+
+            renderDrawLine(x1-crossSize, y1-crossSize, x1+crossSize, y1+crossSize, editorcolors[14]);
+            renderDrawLine(x1-crossSize, y1+crossSize, x1+crossSize, y1-crossSize, editorcolors[14]);
+        }
+    }
+
     renderEnableFog();
 
     videoSetCorrectedAspect();

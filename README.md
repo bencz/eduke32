@@ -66,6 +66,12 @@ The full automap highlights every living monster with a red arrow, including mon
 
 Dead monsters and invisible sprites are not displayed. This feature is independent of `dnmagnet` and remains available during normal gameplay.
 
+## Secret Areas on the Automap
+
+The automap also outlines every secret area that has not been found yet in yellow, with a yellow cross at its center so small secrets stay visible when zoomed out. Secret areas are shown even in sectors that have not been visited.
+
+Once Duke enters a secret area and the "secret place found" message appears, that area disappears from the map, so the yellow outlines always show the secrets still missing on the current level.
+
 ## Notes
 
 - The custom changes are intended primarily for single-player games.
