@@ -8,11 +8,21 @@ It adds custom cheats and gameplay improvements to Duke Nukem 3D while preservin
 
 Place an original `DUKE3D.GRP` file in the project root directory.
 
-Build the game without the GTK2 interface:
+Build the game without the GTK2 interface, optimized for the local CPU:
 
 ```sh
-gmake -j$(nproc) HAVE_GTK2=0
+./build.sh
 ```
+
+This is equivalent to:
+
+```sh
+gmake -j$(nproc) HAVE_GTK2=0 OPTOPT="-march=native"
+```
+
+`-march=native` enables every instruction set extension supported by the build machine (SSE4, AVX, AVX2, FMA, AVX-512, ...), so the resulting binary may not run on other CPUs. Without `OPTOPT`, the upstream default for x86_64 is `-march=core2` (SSE3 only).
+
+To use different flags, set `OPTOPT` when calling the script, for example `OPTOPT="-march=x86-64-v3" ./build.sh`. Make does not track compiler flag changes, so run `make clean` before rebuilding with different flags.
 
 Run the game using SDL's X11 video driver:
 
